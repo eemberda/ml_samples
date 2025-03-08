@@ -1,10 +1,11 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 import pandas as pd
 import evaluate
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
 
 # Load the benchmark dataset using the datasets library
 dataset = load_dataset("eemberda/english-ceb-bible-prompt")
@@ -14,13 +15,13 @@ data = dataset['train'].to_pandas()
 
 # Select a subset of prompts and references for evaluation
 prompts = data['prompt'].tolist()[:10]  # Adjust the number as needed
-references = data['reference'].tolist()[:10]  # Ensure this column exists in your dataset
+references = data['cebuano'].tolist()[:10]  # Ensure this column exists in your dataset
 
 # Define the models to evaluate
 models = {
-    "BLOOM": "bigscience/bloom",
-    "Llama 3": "meta-llama/Llama-3-7b-hf",
-    "Mistral 7B": "mistralai/Mistral-7B"
+    "Llama 3": "meta-llama/Meta-Llama-3-8B",
+    "Mistral 7B": "mistralai/Mistral-7B-v0.1",
+    "Deepseek R1": "DeepSeek-R1-Distill-Qwen-7B",
 }
 
 # Function to perform translation
@@ -35,13 +36,18 @@ bleu = evaluate.load("bleu")
 
 # Evaluate each model
 results = []
-for model_name, model_path in models.items():
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+for model_name, model_path in tqdm(models.items()):
     print(f"Evaluating {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(model_path)
+    model.to(device)
+    tokenizer.to(device)
     model.eval()
     translations = []
-    for prompt in prompts:
+    for prompt in tqdm(prompts):
         translation = translate(tokenizer, model, prompt)
         translations.append(translation)
     # Compute BLEU score
